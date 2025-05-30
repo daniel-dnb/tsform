@@ -91,14 +91,7 @@ const form = useAppForm({
   onSubmit: (data) => {
     console.log(data.value)
   },
-  defaultValues: {
-    cep: '',
-    estado: '',
-    logradouro: '',
-    complemento: undefined,
-    bairro: '',
-    localidade: '',
-  },
+  defaultValues: {} as FormData,
 })
 ```
 
@@ -116,7 +109,7 @@ const formSchema = z.object({
   logradouro: z
     .string('Logradouro é obrigatório')
     .min(1, 'Logradouro é obrigatório'),
-  complemento: z.string().optional(),
+  complemento: z.string('Complemento é obrigatório').optional(),
   bairro: z.string('Bairro é obrigatório').min(1, 'Bairro é obrigatório'),
   localidade: z.string('Cidade é obrigatório').min(1, 'Cidade é obrigatório'),
 })
@@ -124,10 +117,10 @@ const formSchema = z.object({
 
 ### Integração com ViaCEP
 
-Busca automática de endereço usando TanStack Query:
+Busca automática de endereço usando TanStack Query com tratamento de erros:
 
 ```tsx
-const { mutate: getAddress } = useMutation({
+const { mutate, isError } = useMutation({
   mutationFn: async (cep: string) => {
     const res = await axios.get<Address>(
       `https://viacep.com.br/ws/${cep}/json/`,
@@ -137,10 +130,32 @@ const { mutate: getAddress } = useMutation({
     }
     return res.data
   },
-  onError: (error) => {
-    // Tratamento de erro com toast
-  },
 })
+
+const fetchAddress = (cep: string) => {
+  const cepNumbers = cep.replace(/[^0-9]/g, '')
+
+  if (cepNumbers.length === 8) {
+    mutate(cepNumbers, {
+      onSuccess: (data) => {
+        form.setFieldValue('estado', data.estado)
+        form.setFieldValue('logradouro', data.logradouro)
+        form.setFieldValue('complemento', data.complemento)
+        form.setFieldValue('bairro', data.bairro)
+        form.setFieldValue('localidade', data.localidade)
+      },
+      onError: (error) => {
+        if (error instanceof AxiosError) {
+          toaster.error({
+            description: error.message,
+            type: 'error',
+          })
+        }
+        form.reset()
+      },
+    })
+  }
+}
 ```
 
 ### Componentes Customizados
@@ -152,32 +167,50 @@ O projeto inclui componentes personalizados que integram TanStack Form com Chakr
   name="cep"
   listeners={{
     onChangeDebounceMs: 300,
-    onChange: ({ value }) => {
-      const onlyNumbers = value?.replace(/[^0-9]/g, '')
-      if (onlyNumbers.length === 8) {
-        getAddress(onlyNumbers, {
-          onSuccess: (data) => {
-            // Preenche automaticamente os campos
-          },
-        })
-      }
-    },
+    onChange: ({ value }) => fetchAddress(value || ''),
   }}
   children={(field) => <field.input label="CEP" mask="99999-999" />}
 />
+
+<form.AppField
+  name="estado"
+  children={(field) => (
+    <field.input
+      label="Estado"
+      disabled={!form.state.values.cep || !isError}
+    />
+  )}
+/>
+```
+
+### Estados Condicionais
+
+Os campos são automaticamente desabilitados quando não há CEP preenchido ou quando ocorre erro na busca:
+
+```tsx
+disabled={!form.state.values.cep || !isError}
 ```
 
 ## 🔧 Customização
 
 ### Adicionando Novos Campos
 
-1. Atualize o tipo `FormData` e o `formSchema`
-2. Adicione o campo nos `defaultValues`
+1. Atualize o tipo `Address` e `FormData`
+2. Modifique o `formSchema` do Zod
 3. Crie um novo `form.AppField` no componente
+4. Atualize a lógica de `onSuccess` na mutação
 
 ### Personalizando a Validação
 
 Modifique o esquema Zod em `formSchema` para ajustar as regras de validação conforme necessário.
+
+### Configurando Máscara de Input
+
+O projeto usa `use-mask-input` para formatação automática:
+
+```tsx
+<field.input label="CEP" mask="99999-999" />
+```
 
 ### Estilização
 

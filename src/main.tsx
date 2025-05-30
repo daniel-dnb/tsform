@@ -8,7 +8,7 @@ import { routeTree } from './routeTree.gen'
 import reportWebVitals from './reportWebVitals.ts'
 
 scan({
-  enabled: import.meta.env.DEV,
+  enabled: true,
 })
 
 // Create a new router instance

@@ -50,7 +50,7 @@ function App() {
     defaultValues: {} as FormData,
   })
 
-  const { mutate: getAddress } = useMutation({
+  const { mutate, isError } = useMutation({
     mutationFn: async (cep: string) => {
       const res = await axios.get<Address>(
         `https://viacep.com.br/ws/${cep}/json/`,
@@ -60,15 +60,32 @@ function App() {
       }
       return res.data
     },
-    onError: (error) => {
-      if (error instanceof AxiosError) {
-        toaster.error({
-          description: error.message,
-          type: 'error',
-        })
-      }
-    },
   })
+
+  const fetchAddress = (cep: string) => {
+    const cepNumbers = cep.replace(/[^0-9]/g, '')
+
+    if (cepNumbers.length === 8) {
+      mutate(cepNumbers, {
+        onSuccess: (data) => {
+          form.setFieldValue('estado', data.estado)
+          form.setFieldValue('logradouro', data.logradouro)
+          form.setFieldValue('complemento', data.complemento)
+          form.setFieldValue('bairro', data.bairro)
+          form.setFieldValue('localidade', data.localidade)
+        },
+        onError: (error) => {
+          if (error instanceof AxiosError) {
+            toaster.error({
+              description: error.message,
+              type: 'error',
+            })
+          }
+          form.reset()
+        },
+      })
+    }
+  }
 
   return (
     <Flex direction="column" gap={4} align="center" justify="center" h="100vh">
@@ -88,33 +105,29 @@ function App() {
           name="cep"
           listeners={{
             onChangeDebounceMs: 300,
-            onChange: ({ value }) => {
-              const onlyNumbers = value?.replace(/[^0-9]/g, '')
-
-              if (onlyNumbers.length === 8) {
-                getAddress(onlyNumbers, {
-                  onSuccess: (data) => {
-                    form.setFieldValue('estado', data.estado)
-                    form.setFieldValue('logradouro', data.logradouro)
-                    form.setFieldValue('complemento', data.complemento)
-                    form.setFieldValue('bairro', data.bairro)
-                    form.setFieldValue('localidade', data.localidade)
-                  },
-                })
-              }
-            },
+            onChange: ({ value }) => fetchAddress(value || ''),
           }}
           children={(field) => <field.input label="CEP" mask="99999-999" />}
         />
 
         <form.AppField
           name="estado"
-          children={(field) => <field.input label="Estado" />}
+          children={(field) => (
+            <field.input
+              label="Estado"
+              disabled={!form.state.values.cep || !isError}
+            />
+          )}
         />
 
         <form.AppField
           name="logradouro"
-          children={(field) => <field.input label="Logradouro" />}
+          children={(field) => (
+            <field.input
+              label="Logradouro"
+              disabled={!form.state.values.cep || !isError}
+            />
+          )}
         />
 
         <form.AppField
@@ -124,12 +137,22 @@ function App() {
 
         <form.AppField
           name="bairro"
-          children={(field) => <field.input label="Bairro" />}
+          children={(field) => (
+            <field.input
+              label="Bairro"
+              disabled={!form.state.values.cep || !isError}
+            />
+          )}
         />
 
         <form.AppField
           name="localidade"
-          children={(field) => <field.input label="Cidade" />}
+          children={(field) => (
+            <field.input
+              label="Cidade"
+              disabled={!form.state.values.cep || !isError}
+            />
+          )}
         />
 
         <form.Subscribe
